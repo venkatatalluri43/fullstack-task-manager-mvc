@@ -1,0 +1,151 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-lint-test:
+    name: Backend lint & test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install flake8
+
+      - name: Lint with flake8
+        run: flake8 app config.py run.py wsgi.py
+
+      - name: Run tests with coverage
+        run: pytest --cov=app --cov-report=term-missing
+
+  frontend-lint-build:
+    name: Frontend lint & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  build-images:
+    name: Build Docker images
+    needs: [backend-lint-test, frontend-lint-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          load: true
+          tags: task-manager-backend:ci
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          load: true
+          tags: task-manager-frontend:ci
+
+      - name: Save images as artifacts
+        run: |
+          mkdir -p /tmp/images
+          docker save task-manager-backend:ci -o /tmp/images/backend.tar
+          docker save task-manager-frontend:ci -o /tmp/images/frontend.tar
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp/images/*.tar
+          retention-days: 1
+
+  integration-tests:
+    name: Integration tests (docker-compose)
+    needs: [build-images]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp/images
+
+      - name: Load images
+        run: |
+          docker load -i /tmp/images/backend.tar
+          docker load -i /tmp/images/frontend.tar
+          docker tag task-manager-backend:ci fullstack-task-app-backend
+          docker tag task-manager-frontend:ci fullstack-task-app-frontend
+
+      - name: Start stack
+        run: docker compose up -d backend frontend
+
+      - name: Wait for backend health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:5000/api/health; then exit 0; fi
+            sleep 2
+          done
+          echo "Backend failed to become healthy" >&2
+          docker compose logs
+          exit 1
+
+      - name: Run smoke/integration test
+        run: |
+          set -e
+          TOKEN=$(curl -sf -X POST http://localhost:5000/api/auth/register \
+            -H "Content-Type: application/json" \
+            -d '{"username":"ci_user","password":"ci_password123"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+          TASK_ID=$(curl -sf -X POST http://localhost:5000/api/tasks \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d '{"title":"CI smoke task"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['task']['id'])")
+
+          curl -sf http://localhost:5000/api/tasks \
+            -H "Authorization: Bearer $TOKEN" | grep -q "CI smoke task"
+
+          curl -sf -o /dev/null -w "%{http_code}" http://localhost:8080 | grep -q 200
+
+          echo "Integration test passed for task id $TASK_ID"
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
