@@ -11,7 +11,15 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
-    tasks = db.relationship("Task", backref="owner", lazy=True, cascade="all, delete-orphan")
+    tasks = db.relationship(
+        "Task", foreign_keys="Task.user_id", backref="owner", lazy=True, cascade="all, delete-orphan"
+    )
+    projects = db.relationship(
+        "Project", foreign_keys="Project.owner_id", backref="owner", lazy=True, cascade="all, delete-orphan"
+    )
+    assigned_tasks = db.relationship(
+        "Task", foreign_keys="Task.assignee_id", backref="assignee", lazy=True
+    )
 
     def set_password(self, password):
         self.password_hash = bcrypt.generate_password_hash(password).decode("utf-8")

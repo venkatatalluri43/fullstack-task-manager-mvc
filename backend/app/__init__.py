@@ -23,9 +23,13 @@ def create_app(config_class=Config):
 
     from app.views.auth_views import auth_bp
     from app.views.task_views import task_bp
+    from app.views.project_views import project_bp
+    from app.views.user_views import user_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(task_bp, url_prefix="/api/tasks")
+    app.register_blueprint(project_bp, url_prefix="/api/projects")
+    app.register_blueprint(user_bp, url_prefix="/api/users")
 
     @app.route("/api/health")
     def health():
@@ -40,7 +44,7 @@ def create_app(config_class=Config):
         return jsonify(error="Internal server error"), 500
 
     with app.app_context():
-        from app.models import user, task  # noqa: F401
+        from app.models import user, project, task  # noqa: F401
         db.create_all()
 
     return app

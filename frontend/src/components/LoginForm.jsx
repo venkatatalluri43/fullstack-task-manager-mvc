@@ -28,7 +28,8 @@ export default function LoginForm() {
 
   return (
     <div className="auth-card">
-      <h1>Task Manager</h1>
+      <span className="auth-mark">T</span>
+      <h1>Taskflow</h1>
       <p className="subtitle">{mode === 'login' ? 'Sign in to your account' : 'Create a new account'}</p>
       <form onSubmit={handleSubmit}>
         <label>

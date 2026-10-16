@@ -134,10 +134,15 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"username":"ci_user","password":"ci_password123"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
+          PROJECT_ID=$(curl -sf -X POST http://localhost:5000/api/projects \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $TOKEN" \
+            -d '{"name":"CI smoke project"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['project']['id'])")
+
           TASK_ID=$(curl -sf -X POST http://localhost:5000/api/tasks \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $TOKEN" \
-            -d '{"title":"CI smoke task"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['task']['id'])")
+            -d "{\"title\":\"CI smoke task\",\"project_id\":$PROJECT_ID}" | python3 -c "import sys,json; print(json.load(sys.stdin)['task']['id'])")
 
           curl -sf http://localhost:5000/api/tasks \
             -H "Authorization: Bearer $TOKEN" | grep -q "CI smoke task"

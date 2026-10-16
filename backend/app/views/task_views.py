@@ -17,8 +17,13 @@ task_bp = Blueprint("tasks", __name__)
 @login_required
 def get_tasks():
     scope = request.args.get("scope", "mine")
+    project_id = request.args.get("project_id", type=int)
+    assigned_to_me = request.args.get("assigned_to_me")
+
     user_id = request.user_id if scope == "mine" else None
-    tasks = list_tasks(user_id=user_id)
+    assignee_id = request.user_id if assigned_to_me == "true" else None
+
+    tasks = list_tasks(user_id=user_id, project_id=project_id, assignee_id=assignee_id)
     return jsonify(tasks=[t.to_dict() for t in tasks]), 200
 
 
@@ -41,7 +46,11 @@ def post_task():
             title=data.get("title"),
             description=data.get("description"),
             user_id=request.user_id,
+            project_id=data.get("project_id"),
             status=data.get("status", "pending"),
+            priority=data.get("priority", "medium"),
+            due_date=data.get("due_date"),
+            assignee_id=data.get("assignee_id"),
         )
         return jsonify(task=task.to_dict()), 201
     except TaskError as e:

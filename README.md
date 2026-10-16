@@ -20,31 +20,45 @@ local CI/CD, and optional Kubernetes/Nginx infrastructure simulation.
 ```
 backend/
   app/
-    models/        # Data schema & DB access (SQLAlchemy) — User, Task
+    models/        # Data schema & DB access (SQLAlchemy) — User, Project, Task
     views/         # HTTP routing layer (Flask blueprints) — request/response only
-    controllers/    # Business logic — auth rules, task ownership, validation
+    controllers/    # Business logic — auth rules, project/task ownership, assignment, validation
   config.py         # Flask config (SQLite path, JWT secret/expiry)
   run.py / wsgi.py   # Entrypoints (dev server / gunicorn)
-  tests/             # pytest suite (15 tests, auth + tasks)
+  tests/             # pytest suite (30 tests — auth, projects, tasks, users)
 
 frontend/
   src/
-    components/      # Views — LoginForm, Dashboard, TaskForm, TaskList, TaskItem
-    context/          # AuthContext — client-side auth state/controller
-    services/api.js   # API client (fetch wrapper, JWT header injection)
+    pages/           # Route-level screens — Dashboard, Projects, ProjectDetail, MyWork, Profile, Login
+    layouts/          # AppLayout — sidebar + routed content shell
+    components/       # Reusable pieces — Sidebar, TopBar, TaskCard, modals, ui/ (badges, stat cards, etc.)
+    context/           # AuthContext — client-side auth state/controller
+    services/api.js    # API client (fetch wrapper, JWT header injection)
 ```
 
 Backend "controllers" own all business rules (ownership checks, status
-validation, duplicate-username checks); "views" (`*_views.py`) are thin route
-handlers that parse the request, call a controller, and shape the JSON
-response; "models" only define schema and persistence.
+validation, duplicate-username checks, assignment permissions); "views"
+(`*_views.py`) are thin route handlers that parse the request, call a
+controller, and shape the JSON response; "models" only define schema and
+persistence.
 
-## Features
+## End-to-end journey
 
-- Register / login (JWT-based auth, bcrypt password hashing)
-- Create / read / update (status) / delete tasks
-- Multi-user: tasks are scoped to the owner by default, with an "All Users'
-  Tasks" view to see everyone's tasks (read-only for tasks you don't own)
+This isn't just a flat task list — it models a real small-team workflow:
+
+1. **Register / log in** (JWT-based auth, bcrypt password hashing)
+2. **Onboarding**: a first-time user with no projects lands on a "create your
+   first project" prompt instead of an empty dashboard
+3. **Create a Project** to group related work (e.g. "Launch Plan")
+4. **Add tasks** to the project with a **priority** (low/medium/high) and an
+   optional **due date**
+5. **Assign tasks** to any registered teammate (defaults to yourself) — the
+   assignee can update the task's status even if they don't own it; only the
+   project/task owner can edit title, description, or delete
+6. **Track progress** on the Dashboard (stats across all your projects),
+   per-project progress bars, and a dedicated **My Work** view filtered by
+   status, showing everything assigned to you across every project
+7. **Profile** page with account info and personal completion stats
 
 ## Running locally (no Docker)
 

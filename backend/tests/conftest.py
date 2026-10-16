@@ -24,3 +24,9 @@ def auth_headers(client):
     resp = client.post("/api/auth/login", json={"username": "alice", "password": "secret123"})
     token = resp.get_json()["token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def project_id(client, auth_headers):
+    resp = client.post("/api/projects", json={"name": "Launch Plan"}, headers=auth_headers)
+    return resp.get_json()["project"]["id"]
