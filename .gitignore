@@ -15,3 +15,8 @@ frontend/dist/
 .DS_Store
 .vscode/
 .idea/
+
+# Office lock files
+~$*.pptx
+~$*.docx
+~$*.xlsx
